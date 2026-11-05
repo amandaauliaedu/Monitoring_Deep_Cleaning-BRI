@@ -416,16 +416,20 @@ export function buildAnalytics(model, periodParam) {
       return { week: p.weekNumber, area: p.area, poin: p.poin, filled, total: base.length, pct: pct(filled, base.length) };
     });
 
-  // Keterangan terbaru
+  // Keterangan terbaru (maks. 30 per Week, terbaru di atas)
   const notes = [];
+  const noteCount = { 1: 0, 2: 0, 3: 0, 4: 0 };
   for (const r of rs) {
-    if (notes.length >= 20) break;
+    const w = r.weekNumber;
+    if (!(w >= 1 && w <= 4) || noteCount[w] >= 30) continue;
     for (const p of model.points) {
       const it = r.items[p.key];
-      if (it && it.note) {
+      if (it && it.note && noteCount[w] < 30) {
+        noteCount[w]++;
         notes.push({
           tanggal: r.tanggal, jam: r.jam, petugas: r.petugas, bo: r.branchOffice, uker: r.namaUker,
-          week: r.weekNumber, phase: r.phase, poin: p.poin, area: p.area, note: it.note
+          kodeBO: r.kodeBO, kodeUker: r.kodeUker, pointId: p.id,
+          week: w, phase: r.phase, poin: p.poin, area: p.area, note: it.note
         });
       }
     }
@@ -468,4 +472,17 @@ export function buildAnalytics(model, periodParam) {
     matrix,
     loadedAt: model.loadedAt
   };
+}
+
+/* ------------------------------ DAFTAR UKER (UNDUH) ------------------------------ */
+/** mode: 'belum' | 'sudah'; scope: 'all' | '1'..'4' (aturan sama dengan daftar di Data Analyst). */
+export function buildUnitList(model, periodParam, mode, scope) {
+  const { period, matrix } = buildAnalytics(model, periodParam);
+  const filledIn = (m, w) => m.bits[(w - 1) * 2] === '1' || m.bits[(w - 1) * 2 + 1] === '1';
+  const rows = matrix.filter((m) => {
+    if (scope === 'all') return mode === 'belum' ? m.status === 'belum' : m.status !== 'belum';
+    const done = filledIn(m, Number(scope));
+    return mode === 'belum' ? !done : done;
+  });
+  return { period, rows };
 }

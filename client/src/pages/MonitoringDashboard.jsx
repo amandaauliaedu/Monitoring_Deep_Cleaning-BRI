@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { CheckCircle2, ChevronDown, CircleDot, AlertTriangle, Search } from "lucide-react";
 import { useApi } from "../api.js";
@@ -6,11 +7,11 @@ import { AnimatedNumber, Collapse, ErrorBox, Lightbox, Loading, Page, PeriodSele
 import { WEEK_AREAS, fmtDate, nf, periodLabel } from "../utils.js";
 
 /* ---------- Satu sisi (Before / After) pada satu poin ---------- */
-function Side({ data, tone, onOpen }) {
+function Side({ data, tone, onOpen, hl }) {
   const has = data && (data.photos.length || data.note);
-  if (!has) return <div className={`side-box ${tone} empty`}>Belum ada foto</div>;
+  if (!has) return <div className={`side-box ${tone} empty${hl ? " hl" : ""}`}>Belum ada foto</div>;
   return (
-    <div className={`side-box ${tone}`}>
+    <div className={`side-box ${tone}${hl ? " hl" : ""}`}>
       {data.photos.length > 0 && (
         <div className="thumbs">
           {data.photos.map((id, i) => <Thumb key={id} id={id} onClick={() => onOpen(i)} label={`Foto ${i + 1}`} />)}
@@ -22,9 +23,20 @@ function Side({ data, tone, onOpen }) {
 }
 
 /* ---------- Isi satu Week (dimuat saat dibuka) ---------- */
-function WeekDetail({ kodeUker, week, period }) {
+function WeekDetail({ kodeUker, week, period, focus }) {
   const { data, error } = useApi(`/api/dashboard/unit/${kodeUker}/week/${week}?period=${encodeURIComponent(period)}`);
   const [lb, setLb] = useState({ items: [], index: null });
+  const [hlPoint, setHlPoint] = useState(focus?.poin || "");
+
+  // Gulir ke poin yang dituju (menunggu animasi buka selesai), sorot beberapa detik.
+  useEffect(() => {
+    if (!data || !focus?.poin) return undefined;
+    const t1 = setTimeout(() => {
+      document.getElementById(`poin-${focus.poin}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 450);
+    const t2 = setTimeout(() => setHlPoint(""), 6000);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, [data, focus?.poin]);
 
   if (error) return <ErrorBox error={error} />;
   if (!data) return <Loading text="Memuat foto..." />;
@@ -51,13 +63,13 @@ function WeekDetail({ kodeUker, week, period }) {
         <div key={a.area} className="area-block">
           <h5>{a.area}</h5>
           {a.points.map((p, i) => (
-            <div key={p.id} className="point-row">
+            <div key={p.id} id={`poin-${p.id}`} className={`point-row${hlPoint === p.id ? " focus" : ""}`}>
               <div className="point-title">
                 {i + 1}. {p.poin} {!p.wajib && <em>Tidak wajib</em>}
               </div>
               <div className="split">
-                <Side data={p.before} tone="before" onOpen={(n) => openFor(p, "before", n)} />
-                <Side data={p.after} tone="after" onOpen={(n) => openFor(p, "after", n)} />
+                <Side data={p.before} tone="before" hl={hlPoint === p.id && focus?.phase === "before"} onOpen={(n) => openFor(p, "before", n)} />
+                <Side data={p.after} tone="after" hl={hlPoint === p.id && focus?.phase === "after"} onOpen={(n) => openFor(p, "after", n)} />
               </div>
             </div>
           ))}
@@ -70,7 +82,7 @@ function WeekDetail({ kodeUker, week, period }) {
 }
 
 /* ---------- Baris Week ---------- */
-function WeekRow({ unit, w, open, onToggle, period }) {
+function WeekRow({ unit, w, open, onToggle, period, focus }) {
   const done = w.before && w.after ? "lengkap" : w.before || w.after ? "berjalan" : "belum";
   return (
     <div className="row-l3">
@@ -84,14 +96,14 @@ function WeekRow({ unit, w, open, onToggle, period }) {
         <StatusBadge status={done} />
       </button>
       <Collapse open={open}>
-        <WeekDetail kodeUker={unit.kodeUker} week={w.week} period={period} />
+        <WeekDetail kodeUker={unit.kodeUker} week={w.week} period={period} focus={focus && focus.uker === unit.kodeUker && focus.week === w.week ? focus : null} />
       </Collapse>
     </div>
   );
 }
 
 /* ---------- Baris Uker ---------- */
-function UnitRow({ unit, open, onToggle, openWeeks, toggleWeek, period }) {
+function UnitRow({ unit, open, onToggle, openWeeks, toggleWeek, period, focus }) {
   return (
     <div className="row-l2">
       <button className="row-btn" onClick={onToggle} aria-expanded={open}>
@@ -110,7 +122,7 @@ function UnitRow({ unit, open, onToggle, openWeeks, toggleWeek, period }) {
       <Collapse open={open}>
         <div className="children">
           {unit.weeks.map((w) => (
-            <WeekRow key={w.week} unit={unit} w={w} period={period} open={openWeeks.has(`${unit.kodeUker}-${w.week}`)} onToggle={() => toggleWeek(`${unit.kodeUker}-${w.week}`)} />
+            <WeekRow key={w.week} unit={unit} w={w} period={period} focus={focus} open={openWeeks.has(`${unit.kodeUker}-${w.week}`)} onToggle={() => toggleWeek(`${unit.kodeUker}-${w.week}`)} />
           ))}
         </div>
       </Collapse>
@@ -120,13 +132,22 @@ function UnitRow({ unit, open, onToggle, openWeeks, toggleWeek, period }) {
 
 /* ---------- Halaman ---------- */
 export default function MonitoringDashboard() {
-  const [period, setPeriod] = useState("latest");
-  const [boSel, setBoSel] = useState("");
-  const [ukerSel, setUkerSel] = useState("");
+  // Tautan dari Data Analyst: ?period=&bo=&uker=&week=&poin=&phase=
+  const [sp] = useSearchParams();
+  const focus = useMemo(() => {
+    const uker = sp.get("uker");
+    const week = Number(sp.get("week"));
+    if (!uker || !(week >= 1 && week <= 4)) return null;
+    return { uker, bo: sp.get("bo") || "", week, poin: sp.get("poin") || "", phase: sp.get("phase") || "" };
+  }, [sp]);
+
+  const [period, setPeriod] = useState(sp.get("period") || "latest");
+  const [boSel, setBoSel] = useState(focus?.bo || "");
+  const [ukerSel, setUkerSel] = useState(focus?.uker || "");
   const [q, setQ] = useState("");
-  const [openBO, setOpenBO] = useState(new Set());
-  const [openUnit, setOpenUnit] = useState(new Set());
-  const [openWeek, setOpenWeek] = useState(new Set());
+  const [openBO, setOpenBO] = useState(() => new Set(focus?.bo ? [focus.bo] : []));
+  const [openUnit, setOpenUnit] = useState(() => new Set(focus ? [focus.uker] : []));
+  const [openWeek, setOpenWeek] = useState(() => new Set(focus ? [`${focus.uker}-${focus.week}`] : []));
 
   const { data, error, refresh } = useApi(`/api/dashboard?period=${period}`, { interval: 60000 });
 
@@ -246,6 +267,7 @@ export default function MonitoringDashboard() {
                         onToggle={() => toggle(setOpenUnit)(u.kodeUker)}
                         openWeeks={openWeek}
                         toggleWeek={toggle(setOpenWeek)}
+                        focus={focus}
                       />
                     ))}
                   </div>

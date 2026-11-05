@@ -7,7 +7,7 @@ Website 4 halaman (Node.js + Express + React + Framer Motion) yang membaca langs
 | **Home** | Hero + ringkasan (total response, BO aktif, uker belum mengisi, uker lengkap), progres per week, aktivitas terbaru |
 | **Live Response** | Tabel response langsung (auto-refresh 15 dtk), filter tgl/bulan/tahun/BO/lokasi/jenis, pencarian, unduh Excel, klik baris untuk melihat semua foto |
 | **Monitoring Dashboard** | BO → dropdown Uker → dropdown Week → tiap poin: **kiri = Sebelum, kanan = Sesudah**, lengkap dengan foto, keterangan, dan lightbox |
-| **Data Analyst** | BO/uker sudah vs belum mengisi, progres per week, performa BO, tren harian, jam tersibuk, jenis uker, petugas teratas, daftar belum mengisi (bisa disalin), cakupan poin tidak wajib, keterangan terbaru, insight otomatis |
+| **Data Analyst** | Filter periode, 4 kotak ringkasan (response, uker sudah mengisi, BO sudah mengisi, foto), Daftar Belum Mengisi (filter per Week/tahap, bisa disalin), dan Keterangan Terbaru (klik untuk membuka poin terkait di Monitoring Dashboard) |
 
 ## 1. Coba cepat (data demo)
 

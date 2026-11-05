@@ -11,7 +11,7 @@ export async function buildWorkbook(model, query) {
   const head = (ws) => {
     const r = ws.getRow(1);
     r.font = { bold: true, color: { argb: "FFFFFFFF" } };
-    r.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF00529B" } };
+    r.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF0857C3" } };
     r.alignment = { vertical: "middle" };
     ws.views = [{ state: "frozen", ySplit: 1 }];
   };
@@ -67,6 +67,52 @@ export async function buildWorkbook(model, query) {
       });
   });
   head(wd);
+
+  return wb.xlsx.writeBuffer();
+}
+
+/* ------------------------------ UNDUH DAFTAR UKER ------------------------------ */
+const STATUS_LABEL = { lengkap: "Lengkap", berjalan: "Berjalan", belum: "Belum diinput" };
+
+export async function buildUnitListWorkbook(rows, { mode, scope, period }) {
+  const wb = new ExcelJS.Workbook();
+  wb.creator = "Dashboard Monitoring Deep Cleaning BRI RO 12 Surabaya";
+
+  const weeks = scope === "all" ? [1, 2, 3, 4] : [Number(scope)];
+  const title = `${mode === "belum" ? "Belum Mengisi" : "Sudah Mengisi"} - ${scope === "all" ? "Semua" : `Week ${scope}`}`;
+  const ws = wb.addWorksheet(title.slice(0, 31));
+
+  const columns = [
+    { header: "No", key: "no", width: 6 },
+    { header: "Branch Office", key: "bo", width: 26 },
+    { header: "Kode Uker", key: "kode", width: 12 },
+    { header: "Unit Kerja", key: "uker", width: 32 },
+    { header: "Jenis Uker", key: "jenis", width: 12 },
+    { header: "Status", key: "status", width: 16 }
+  ];
+  weeks.forEach((w) => {
+    columns.push({ header: `Week ${w} Sebelum`, key: `w${w}b`, width: 16 });
+    columns.push({ header: `Week ${w} Sesudah`, key: `w${w}a`, width: 16 });
+  });
+  ws.columns = columns;
+
+  rows.forEach((m, i) => {
+    const row = {
+      no: i + 1, bo: m.bo, kode: m.kodeUker, uker: m.nama, jenis: m.jenis, status: STATUS_LABEL[m.status] || m.status
+    };
+    weeks.forEach((w) => {
+      row[`w${w}b`] = m.bits[(w - 1) * 2] === "1" ? "Sudah" : "Belum";
+      row[`w${w}a`] = m.bits[(w - 1) * 2 + 1] === "1" ? "Sudah" : "Belum";
+    });
+    ws.addRow(row);
+  });
+
+  const r1 = ws.getRow(1);
+  r1.font = { bold: true, color: { argb: "FFFFFFFF" } };
+  r1.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF0857C3" } };
+  r1.alignment = { vertical: "middle" };
+  ws.views = [{ state: "frozen", ySplit: 1 }];
+  ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: columns.length } };
 
   return wb.xlsx.writeBuffer();
 }

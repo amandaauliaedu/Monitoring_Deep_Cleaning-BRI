@@ -5,10 +5,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { config } from "./config.js";
 import { fetchPhoto } from "./sources.js";
-import { buildWorkbook } from "./export.js";
+import { buildWorkbook, buildUnitListWorkbook } from "./export.js";
 import {
   getModel, buildOverview, buildResponses, buildResponseDetail,
-  buildDashboard, buildUnitWeek, buildAnalytics
+  buildDashboard, buildUnitWeek, buildAnalytics, buildUnitList
 } from "./views.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -49,6 +49,19 @@ export function createApp() {
     res.set({
       "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       "Content-Disposition": `attachment; filename="deep-cleaning-ro12-${stamp}.xlsx"`
+    });
+    res.send(Buffer.from(buffer));
+  }));
+
+  app.get("/api/export-units.xlsx", wrap(async (req, res) => {
+    const mode = req.query.mode === "sudah" ? "sudah" : "belum";
+    const scope = ["1", "2", "3", "4"].includes(String(req.query.scope)) ? String(req.query.scope) : "all";
+    const { period, rows } = buildUnitList(await getModel(), req.query.period, mode, scope);
+    const buffer = await buildUnitListWorkbook(rows, { mode, scope, period });
+    const name = `deep-cleaning-${mode}-mengisi-${scope === "all" ? "semua" : `week-${scope}`}-${period}.xlsx`;
+    res.set({
+      "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "Content-Disposition": `attachment; filename="${name}"`
     });
     res.send(Buffer.from(buffer));
   }));

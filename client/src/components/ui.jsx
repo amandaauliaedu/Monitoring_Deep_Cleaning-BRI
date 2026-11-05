@@ -93,14 +93,16 @@ export function Loading({ text = "Memuat data..." }) {
 }
 
 /* ---------- Pilihan periode ---------- */
+/* Menampilkan nama bulan (mis. "Oktober 2026"); bulan terbaru terpilih otomatis. */
 export function PeriodSelect({ value, periods = [], onChange }) {
+  const current = value === "latest" ? periods[0] || "latest" : value;
   return (
-    <select className="select" value={value} onChange={(e) => onChange(e.target.value)} aria-label="Periode">
-      <option value="latest">Periode terbaru</option>
-      <option value="all">Semua periode</option>
+    <select className="select" value={current} onChange={(e) => onChange(e.target.value)} aria-label="Periode">
+      {periods.length === 0 && value === "latest" && <option value="latest">Memuat periode...</option>}
       {periods.map((p) => (
         <option key={p} value={p}>{periodLabel(p)}</option>
       ))}
+      <option value="all">Semua periode</option>
     </select>
   );
 }
